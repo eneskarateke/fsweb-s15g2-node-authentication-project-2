@@ -1,5 +1,6 @@
 const { JWT_SECRET } = require("../secrets"); // bu secreti kullanın!
 const jwt = require("jsonwebtoken");
+const bcryptjs = require("bcryptjs");
 
 const UserModel = require("../users/users-model");
 
@@ -46,10 +47,14 @@ const sadece = (role_name) => (req, res, next) => {
 
     Tekrar authorize etmekten kaçınmak için kodu çözülmüş tokeni req nesnesinden çekin!
   */
-  if (req.decodedJWT && req.decodedJWT.role_name === role_name) {
-    next();
-  } else {
-    next({ status: 403, message: "Bu, senin için değil" });
+  try {
+    if (req.decodedToken.role_name === role_name) {
+      next();
+    } else {
+      res.status(403).json({ message: "Bu, senin için değil" });
+    }
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -67,7 +72,7 @@ const usernameVarmi = async (req, res, next) => {
     const user = await UserModel.goreBul({ username: username }).first();
     //adım 2: password'unu check ederiz.
     if (user && bcryptjs.compareSync(password, user.password)) {
-      req.dbUser = user; //Session oluşturduk.
+      req.currentUser = currentUser;
       next();
     } else {
       res.status(401).json({
@@ -98,24 +103,26 @@ const rolAdiGecerlimi = (req, res, next) => {
       "message": "rol adı 32 karakterden fazla olamaz"
     }
   */
-  const { role_name } = req.body;
-
-  if (role_name && role_name.trim().length > 0) {
-    req.role_name = role_name.trim();
-    next();
-  } else {
-    req.role_name = "student";
-    next();
-  }
-
-  if (req.role_name === "admin") {
-    return res.status(422).json({ message: "Rol adı admin olamaz" });
-  }
-
-  if (req.role_name.length > 32) {
-    return res
-      .status(422)
-      .json({ message: "rol adı 32 karakterden fazla olamaz" });
+  try {
+    let { role_name } = req.body;
+    if (!role_name) {
+      req.body.role_name = "student";
+      next();
+    } else {
+      role_name = role_name.trim();
+      if (role_name.length > 32) {
+        res
+          .status(422)
+          .json({ message: "rol adı 32 karakterden fazla olamaz" });
+      } else if (role_name == "admin") {
+        res.status(422).json({ message: "Rol adı admin olamaz" });
+      } else {
+        req.body.role_name = role_name;
+        next();
+      }
+    }
+  } catch (error) {
+    next(error);
   }
 };
 

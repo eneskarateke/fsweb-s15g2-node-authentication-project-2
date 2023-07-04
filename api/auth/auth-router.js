@@ -46,30 +46,20 @@ router.post("/login", usernameVarmi, async (req, res, next) => {
       "role_name": "admin" // giriş yapan kulanıcının role adı
     }
    */
-  const { password, username } = req.body;
-  // adım 1: önce kişiyi veritabanından alırız.
-  const user = await User.goreBul({ Email: Email }).first();
-  //adım 2: password'unu check ederiz.
-  if (user && bcrypt.compareSync(password, user.password)) {
-    //req.session.user = user;  //Session oluşturduk.
-    const token = generateToken(user);
-    res.json({ message: `${user.username} geri geldi!`, token });
-  } else {
-    res.status(401).json({ message: `Giriş bilgileri yanlış...` });
+  try {
+    let payload = {
+      subject: req.currentUser.user_id,
+      username: req.currentUser.username,
+      role_name: req.currentUser.role_name,
+    };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1d" });
+    res.json({
+      message: `${req.currentUser.username} geri geldi!`,
+      token: token,
+    });
+  } catch (error) {
+    next(error);
   }
 });
-
-function generateToken(user) {
-  const payload = {
-    subject: user.user_id,
-    username: user.username,
-    role_name: user.role_name,
-  };
-  const options = {
-    expiresIn: "1d",
-  };
-  const token = jwt.sign(payload, JWT_SECRET, options);
-  return token;
-}
 
 module.exports = router;
