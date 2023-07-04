@@ -3,6 +3,7 @@ const { usernameVarmi, rolAdiGecerlimi } = require("./auth-middleware");
 const { JWT_SECRET } = require("../secrets"); // bu secret'ı kullanın!
 const jwt = require("jsonwebtoken");
 const User = require("../users/users-model");
+const bcryptjs = require("bcryptjs");
 
 router.post("/register", rolAdiGecerlimi, async (req, res, next) => {
   /**
