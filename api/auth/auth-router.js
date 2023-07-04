@@ -1,9 +1,9 @@
 const router = require("express").Router();
-const { usernameVarmi, rolAdiGecerlimi } = require("./auth-middleware");
-const { JWT_SECRET } = require("../secrets"); // bu secret'ı kullanın!
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { usernameVarmi, rolAdiGecerlimi } = require("./auth-middleware");
+const { JWT_SECRET, HASH_ROUND } = require("../secrets"); // bu secret'ı kullanın!
 const User = require("../users/users-model");
-const bcryptjs = require("bcryptjs");
 
 router.post("/register", rolAdiGecerlimi, async (req, res, next) => {
   /**
@@ -17,13 +17,17 @@ router.post("/register", rolAdiGecerlimi, async (req, res, next) => {
       "role_name": "angel"
     }
    */
-  const user = req.body;
-  user.password = bcryptjs.hashSync(user.password, 8); // 2 üzeri 8 defa hashleyecek.
-  const newUser = await User.ekle(user);
-  if (newUser) {
-    res.status(201).json(newUser);
-  } else {
-    next();
+  const { username, password } = req.body;
+  try {
+    const hashedPassword = bcrypt.hashSync(password, HASH_ROUND);
+    const user = await User.ekle({
+      username: username,
+      password: hashedPassword,
+      role_name: req.role_name,
+    });
+    res.status(201).json(user);
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -46,19 +50,22 @@ router.post("/login", usernameVarmi, async (req, res, next) => {
       "role_name": "admin" // giriş yapan kulanıcının role adı
     }
    */
-  try {
-    let payload = {
-      subject: req.currentUser.user_id,
-      username: req.currentUser.username,
-      role_name: req.currentUser.role_name,
+  const { username, password } = req.body;
+  const [user] = await User.goreBul({ username: username });
+  if (user && bcrypt.compareSync(password, user.password)) {
+    const payload = {
+      subject: user.user_id,
+      username: user.username,
+      role_name: user.role_name,
     };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1d" });
-    res.json({
-      message: `${req.currentUser.username} geri geldi!`,
-      token: token,
-    });
-  } catch (error) {
-    next(error);
+    const options = {
+      expiresIn: "24h",
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, options);
+    res.json({ message: `${user.username} geri geldi!`, token: token });
+  } else {
+    next({ status: 401, message: "Gecersiz kriter" });
   }
 });
 
