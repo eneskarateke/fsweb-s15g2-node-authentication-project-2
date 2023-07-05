@@ -57,7 +57,7 @@ function idyeGoreBul(user_id) {
   return db("users as u")
     .select("u.user_id", "u.username", "r.role_name as role_name")
     .leftJoin("roles as r", "u.role_id", "r.role_id")
-    .where({ "u.user_id": user_id })
+    .where("u.user_id", user_id)
     .first();
 }
 
